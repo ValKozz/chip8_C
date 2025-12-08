@@ -4,6 +4,8 @@
 #include <stddef.h>
 #include <inttypes.h>
 
+#include "../include/display.h"
+
 #define SYS_MEMORY 4096
 
 typedef struct stack {
@@ -21,6 +23,9 @@ typedef struct chip8 {
 	uint8_t SP;
 	uint8_t DT;
 	uint8_t ST;
+
+	// display struct pointer used to handle drawing to an SDL window
+	display_t displ;
 
 	int running_flag	:1; // flag
 	int draw_flag		:1;	// flag
@@ -51,5 +56,4 @@ int init(chip8_t *chip8, char *rom_path);
 void fetch(chip8_t *chip8);
 // decode and execute instruction
 void decode_and_exec(chip8_t *chip8);
-
 #endif

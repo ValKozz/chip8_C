@@ -12,6 +12,11 @@ int init(chip8_t *chip8, char *rom_path) {
 		return 1;
 	}
 
+	display_t displ = displ_init();
+	if (displ == NULL) return 1;
+
+	chip8->displ = displ;
+
 	FILE *fp = fopen(rom_path, "rb");
 	if (fp == NULL) {
 		fprintf(stderr, "Error, opening ch8 image (NULL): %s\n", rom_path);
@@ -57,4 +62,7 @@ void decode_and_exec(chip8_t *chip8) {
 		printf("Reached MEM_END\n");
 		chip8->running_flag = 0;
 	}
+
+	// if not running, free the display
+	if (!chip8->running_flag) displ_destroy(chip8->displ);
 }
