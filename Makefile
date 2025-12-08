@@ -4,9 +4,9 @@ BUILD_DIR = build
 INCLUDE_DIR = include
 
 LDLIBS = -lSDL2
-CFLAGS= -I$(INCLUDE_DIR) -Wall -Wextra -g
+CFLAGS= -I $(INCLUDE_DIR) -Wall -Wextra -g
 
-$(BUILD_DIR)/chip8: src/main.c 
+$(BUILD_DIR)/chip8: src/main.c src/chip8.c 
 	mkdir -p $(BUILD_DIR)
 	$(CC) $^ -o $@ $(CFLAGS) $(LDLIBS)
 
