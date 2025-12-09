@@ -27,6 +27,37 @@ uint8_t fonts[] = {
 	0xF0, 0x80, 0xF0, 0x80, 0x80, // F
 };
 
+static void store_instr(chip8_t *chip8);
+// push to stack and do error checking
+static void push_stack(chip8_t *chip8);
+// pops the last address from the stack and stores it in PC
+static void pop_stack(chip8_t *chip8);
+
+static void store_instr(chip8_t *chip8) {
+	// Reverse endian
+	chip8->opcode = 
+		(chip8->memory[chip8->PC] << 8) + chip8->memory[chip8->PC+1];
+}
+
+static void push_stack(chip8_t *chip8) {
+	if (chip8->stack.size >= 16) {
+		fprintf(stderr, "Stack overflow Error!\n");
+		chip8->running = 0;
+		return;
+		}
+	*(chip8->stack.array[chip8->stack.size++]) = chip8->PC;
+}
+
+static void pop_stack(chip8_t *chip8) {
+	if (chip8->stack.size == 0) {
+		fprintf(stderr, "Stack underflow Error!\n");
+		chip8->running = 0;
+		return;
+	}
+	chip8->PC = *(chip8->stack.array[chip8->stack.size]);
+	chip8->stack.size--;
+}
+
 int init(chip8_t *chip8, char *rom_path) {
 	if (chip8 == NULL || rom_path == NULL) {
 		return 1;
@@ -63,9 +94,7 @@ int init(chip8_t *chip8, char *rom_path) {
 
 	// put the PC at 0x200
 	chip8->PC = PC_START;
-
-	chip8->opcode = 
-		(chip8->memory[chip8->PC] << 8) + chip8->memory[chip8->PC+1];
+	store_instr(chip8);
 
 	chip8->DT = 0;
 	chip8->ST = 0;
@@ -81,11 +110,12 @@ int init(chip8_t *chip8, char *rom_path) {
 }
 
 void fetch(chip8_t *chip8) {
-	if (!chip8->paused)
+	if (!chip8->paused && !chip8->jmp_flag) {
 		chip8->PC += 2;
-	// Reverse endian
-	chip8->opcode = 
-		(chip8->memory[chip8->PC] << 8) + chip8->memory[chip8->PC+1];
+	} 
+	else chip8->jmp_flag = 0; // else set jmp to 0
+
+	store_instr(chip8);
 }
 
 void decode_and_exec(chip8_t *chip8) {
@@ -113,44 +143,65 @@ void decode_and_exec(chip8_t *chip8) {
 			#endif
 			displ_clear(chip8->displ);
 		}
+
 		else if (instr == 0x00EE) {			
-			if (chip8->stack.size > 0) {
-				#ifdef DEBUG
-				printf("Return to addr %d from stack\n", *(chip8->stack.array[chip8->stack.size]));
-				#endif
-				// very ugly, TODO
-				chip8->PC = *(chip8->stack.array[chip8->stack.size]);
-				chip8->stack.size--;
-			}
-			else {
-				fprintf(stderr, "Stack underflow Error!\n");
-				chip8->running = 0;
-				break;
-			}
-		}
-		else {
-			// TODO 
-			uint8_t addr = instr & 0x0FFF;
-			
 			#ifdef DEBUG
-			printf("Call machine code to %d.\n", 
-				addr);
+			printf("Return to addr %d from stack\n", *(chip8->stack.array[chip8->stack.size]));
 			#endif
-			
-			if (chip8->stack.size >= 16) {
-				fprintf(stderr, "Stack overflow Error!\n");
-				chip8->running = 0;
-				break;
+			pop_stack(chip8);
+			store_instr(chip8);
 			}
 
-			*(chip8->stack.array[chip8->stack.size++]) = chip8->PC;
+		else {
+			uint16_t addr = instr & 0x0FFF;
+			
+			#ifdef DEBUG
+			printf("Call machine code to %d.\n", addr);
+			#endif
+			// store address on the stack 
+			push_stack(chip8);
 			chip8->PC = addr;
-			chip8->opcode = (chip8->memory[chip8->PC] << 8) + chip8->memory[chip8->PC+1];
+			store_instr(chip8);
 		}
 		break;
+	case 0x10: {
+		uint16_t addr = instr & 0x0FFF;
+		#ifdef DEBUG
+		printf("JMP to %d.\n", addr);
+		#endif
+
+		chip8->jmp_flag = 1;
+		
+		if (addr > SYS_MEMORY) {
+			fprintf(stderr, "JMP out of memory! %d\n", addr);
+			chip8->running = 0;
+			return;
+		}
+
+		chip8->PC = addr;
+		break;
+	}
+	case 0x20: {
+		uint16_t addr = instr & 0x0FFF;
+
+		if (addr > SYS_MEMORY) {
+			fprintf(stderr, "JMP to subroutine out of memory! %d\n", addr);
+			chip8->running = 0;
+			return;
+		}
+
+		#ifdef DEBUG
+		printf("Call subroutine to: %d\n", addr);
+		#endif
+
+		push_stack(chip8);
+		chip8->PC = addr;
+		chip8->jmp_flag = 1;
+		break;	
+	}
 	default:
-		// fprintf(stderr, "UNKNOWN OPCODE: %04x\n", instr);
-		// chip8->running = 0;
+		fprintf(stderr, "UNKNOWN OPCODE: %04x\n", instr);
+		chip8->running = 0;
 		break;		
 	}
 

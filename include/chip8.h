@@ -28,10 +28,10 @@ typedef struct chip8 {
 	uint8_t key;	// current pressed key, 0 means None
 	// display struct pointer used to handle drawing to an SDL window
 	display_t displ;
-
 	int running			:1; // flag
 	int draw			:1;	// flag
 	int paused			:1; // flag
+	int jmp_flag		:1;
 } chip8_t; 
 
 enum registers {
