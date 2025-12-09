@@ -40,12 +40,17 @@ static void store_instr(chip8_t *chip8) {
 }
 
 static void push_stack(chip8_t *chip8) {
-	if (chip8->stack.size >= 16) {
+	if (chip8->stack.size >= 15) {
 		fprintf(stderr, "Stack overflow Error!\n");
 		chip8->running = 0;
 		return;
 		}
-	*(chip8->stack.array[chip8->stack.size++]) = chip8->PC;
+
+	chip8->stack.array[chip8->stack.size] = chip8->PC;
+	chip8->stack.size++;
+	#ifdef DEBUG
+	printf("Pushed to stack: %d\n", chip8->PC);
+	#endif
 }
 
 static void pop_stack(chip8_t *chip8) {
@@ -54,8 +59,11 @@ static void pop_stack(chip8_t *chip8) {
 		chip8->running = 0;
 		return;
 	}
-	chip8->PC = *(chip8->stack.array[chip8->stack.size]);
+	chip8->PC = chip8->stack.array[chip8->stack.size-1];
 	chip8->stack.size--;
+	#ifdef DEBUG
+	printf("Poppef from stack: %d\n", chip8->PC);
+	#endif
 }
 
 int init(chip8_t *chip8, char *rom_path) {
@@ -130,7 +138,7 @@ void decode_and_exec(chip8_t *chip8) {
 	uint8_t flag = (chip8->opcode >> 8) & 0xF0;
 
 	#ifdef DEBUG
-	printf("OPCODE: %04x\n", instr);
+	printf("OPCODE: %04x ", instr);
 	#endif
 
 	// TODO
@@ -146,56 +154,55 @@ void decode_and_exec(chip8_t *chip8) {
 
 		else if (instr == 0x00EE) {			
 			#ifdef DEBUG
-			printf("Return to addr %d from stack\n", *(chip8->stack.array[chip8->stack.size]));
+			printf("Return to addr %d from stack\n", chip8->stack.array[chip8->stack.size]);
 			#endif
 			pop_stack(chip8);
-			store_instr(chip8);
 			}
 
 		else {
-			uint16_t addr = instr & 0x0FFF;
+			uint16_t NNN = instr & 0x0FFF;
 			
 			#ifdef DEBUG
-			printf("Call machine code to %d.\n", addr);
+			printf("Call machine code to %d.\n", NNN);
 			#endif
 			// store address on the stack 
 			push_stack(chip8);
-			chip8->PC = addr;
-			store_instr(chip8);
+			chip8->PC = NNN;
+			chip8->jmp_flag = 1;
 		}
 		break;
 	case 0x10: {
-		uint16_t addr = instr & 0x0FFF;
+		uint16_t NNN = instr & 0x0FFF;
 		#ifdef DEBUG
-		printf("JMP to %d.\n", addr);
+		printf("JMP to %d.\n", NNN);
 		#endif
 
 		chip8->jmp_flag = 1;
 		
-		if (addr > SYS_MEMORY) {
-			fprintf(stderr, "JMP out of memory! %d\n", addr);
+		if (NNN > SYS_MEMORY) {
+			fprintf(stderr, "ERROR: JMP out of memory! %d\n", NNN);
 			chip8->running = 0;
 			return;
 		}
 
-		chip8->PC = addr;
+		chip8->PC = NNN;
 		break;
 	}
 	case 0x20: {
-		uint16_t addr = instr & 0x0FFF;
+		uint16_t NNN = instr & 0x0FFF;
 
-		if (addr > SYS_MEMORY) {
-			fprintf(stderr, "JMP to subroutine out of memory! %d\n", addr);
+		if (NNN > SYS_MEMORY) {
+			fprintf(stderr, "ERROR: JMP to subroutine out of memory! %d\n", NNN);
 			chip8->running = 0;
 			return;
 		}
 
 		#ifdef DEBUG
-		printf("Call subroutine to: %d\n", addr);
+		printf("Call subroutine at: %d\n", NNN);
 		#endif
 
 		push_stack(chip8);
-		chip8->PC = addr;
+		chip8->PC = NNN;
 		chip8->jmp_flag = 1;
 		break;	
 	}
@@ -204,7 +211,7 @@ case 0x30: {
 	uint8_t NN = instr & 0x00FF;
 	
 	if (vx > VF) {
-		fprintf(stderr, "Tried to access non-existant register addr: %d", vx);
+		fprintf(stderr, "ERROR: Tried to access non-existant register NNN: %d", vx);
 		chip8->running = 0;
 		return;
 	}
@@ -224,7 +231,7 @@ case 0x40: {
 	uint8_t NN = instr & 0x00FF;
 
 	if (vx > VF) {
-		fprintf(stderr, "Tried to access non-existant register addr: %d", vx);
+		fprintf(stderr, "ERROR: Tried to access non-existant register NNN: %d", vx);
 		chip8->running = 0;
 		return;
 	}
@@ -244,7 +251,7 @@ case 0x50: {
 	uint8_t vy = (instr & 0X00F0) >> 4;
 	
 	if (vx > VF || vy > VF) {
-		fprintf(stderr, "Tried to access non-existant register addr: vx: %d vy: %d", vx, vy);
+		fprintf(stderr, "ERROR: Tried to access non-existant register NNN: vx: %d vy: %d", vx, vy);
 		chip8->running = 0;
 		return;
 	}
@@ -264,7 +271,7 @@ case 0x60: {
 	uint8_t NN = instr & 0x00FF;
 
 	if (vx > VF) {
-		fprintf(stderr, "Tried to access non-existant register addr: %d", vx);
+		fprintf(stderr, "ERROR: Tried to access non-existant register NNN: %d", vx);
 		chip8->running = 0;
 		return;
 	}
@@ -280,7 +287,7 @@ case 0x70: {
 	uint8_t NN = instr & 0x00FF;
 
 	if (vx > VF) {
-		fprintf(stderr, "Tried to access non-existant register addr: %d", vx);
+		fprintf(stderr, "ERROR: Tried to access non-existant register NNN: %d", vx);
 		chip8->running = 0;
 		return;
 	}
@@ -297,7 +304,7 @@ case 0x80: {
 	uint8_t vy = (instr & 0X00F0) >> 4;
 
 	if (vx > VF || vy > VF) {
-		fprintf(stderr, "Tried to access non-existant register addr: vx: %d vy: %d", vx, vy);
+		fprintf(stderr, "ERROR: Tried to access non-existant register NNN: vx: %d vy: %d", vx, vy);
 		chip8->running = 0;
 		return;
 	}
@@ -337,7 +344,7 @@ case 0x80: {
 			// check for overflow first
 			if (res > UINT8_MAX) {
 				#ifdef DEBUG
-				printf("overflow detected\n");
+				printf("overflow detected:  ");
 				#endif		
 				chip8->registers[VF] = 1;
 			}
@@ -358,7 +365,7 @@ case 0x80: {
 			// check for overflow first
 			if (res < 0) {
 				#ifdef DEBUG
-				printf("underflow detected\n");
+				printf("underflow detected: ");
 				#endif		
 				chip8->registers[VF] = 0;
 			}
@@ -387,7 +394,7 @@ case 0x80: {
 			int res = chip8->registers[vy] - chip8->registers[vx];
 			if (res < 0) {
 				#ifdef DEBUG
-				printf("underflow detected\n");
+				printf("underflow detected: ");
 				#endif
 				chip8->registers[VF] = 0;
 			}
@@ -418,7 +425,7 @@ case 0x90: {
 	uint8_t vy = (instr & 0X00F0) >> 4;
 		
 	if (vx > VF || vy > VF) {
-		fprintf(stderr, "Tried to access non-existant register addr: vx: %d vy: %d", vx, vy);
+		fprintf(stderr, "ERROR: Tried to access non-existant register NNN: vx: %d vy: %d", vx, vy);
 		chip8->running = 0;
 		return;
 	}
@@ -434,8 +441,8 @@ case 0x90: {
 	break;	
 	}
 case 0xA0: {
-	uint16_t addr = instr & 0X0FFF;
-	chip8->I = addr;
+	uint16_t NNN = instr & 0X0FFF;
+	chip8->I = NNN;
 	#ifndef DEBUG
 	printf("Set I to %d\n",
 		chip8->I);
@@ -443,25 +450,59 @@ case 0xA0: {
 	break;
 	}
 case 0xB0: {
-	uint16_t addr = instr & 0X0FFF;
+	uint16_t NNN = instr & 0X0FFF;
 	#ifndef DEBUG
 	printf("JMP to (V0) %d + %d = %d\n",
-		chip8->registers[V0], addr, addr + chip8->registers[V0]);
+		chip8->registers[V0], NNN, NNN + chip8->registers[V0]);
 	#endif
 	
-	chip8->PC = chip8->registers[V0] + addr;
+	chip8->PC = chip8->registers[V0] + NNN;
 	chip8->jmp_flag = 1;
 	break;
 	}
+case 0xD0: {
+	// TODO draw
+	uint8_t vx = (instr & 0x0F00) >> 8;
+	uint8_t vy = (instr & 0X00F0) >> 4;
+	uint8_t N = instr & 0X000F;
+
+	if (vx > VF || vy > VF) {
+		fprintf(stderr, "ERROR: Tried to access non-existant register NNN: vx: %d vy: %d", vx, vy);
+		chip8->running = 0;
+		return;
+	}
+
+	#ifdef DEBUG
+	printf("TODO Draw on screen: %d %d height: %d\n",
+		chip8->registers[vx], chip8->registers[vy], N);
+	#endif
+
+	break;
+	}
+case 0xE0: {
+	uint16_t subflag = instr & 0x00FF;
+	if (subflag == 0x9E) {
+
+	}	
+	else if (subflag == 0xA1) {
+
+	}
+	else {
+		fprintf(stderr, "ERROR: ILLEGAL OPCODE 0xE0: %04x\n", instr);
+		chip8->running = 0;
+		return;
+		}
+	}
+	break;
 
 	default:
-		fprintf(stderr, "UNKNOWN OPCODE: %04x\n", instr);
+		fprintf(stderr, "ERROR: UNKNOWN OPCODE: %04x\n", instr);
 		chip8->running = 0;
-		break;		
+		return;
 	}
 
 	if (chip8->PC+1 == MEM_END) {
-		printf("Reached MEM_END\n");
+		fprintf(stderr, "ERROR: Reached MEM_END\n");
 		// temp
 		chip8->paused = 1;
 	}

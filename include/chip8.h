@@ -10,7 +10,7 @@
 
 typedef struct stack {
 	size_t size;
-	uint16_t *array[16];
+	uint16_t array[16];
 } stack_t;
 
 typedef struct chip8 {
