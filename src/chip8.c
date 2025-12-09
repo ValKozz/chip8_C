@@ -1,6 +1,6 @@
 #include <stdio.h>
 #include <stddef.h>
-#include <inttypes.h>
+#include <stdint.h>
 
 #include "../include/chip8.h"
 #include "SDL2/SDL.h"
@@ -199,6 +199,261 @@ void decode_and_exec(chip8_t *chip8) {
 		chip8->jmp_flag = 1;
 		break;	
 	}
+case 0x30: {
+	uint8_t vx = (instr & 0x0F00) >> 8;
+	uint8_t NN = instr & 0x00FF;
+	
+	if (vx > VF) {
+		fprintf(stderr, "Tried to access non-existant register addr: %d", vx);
+		chip8->running = 0;
+		return;
+	}
+
+	#ifdef DEBUG
+	printf("Compare: %d == %d(NN)\n", 
+		chip8->registers[vx], NN);
+	#endif
+	// Skips the next instruction if VX equals NN
+	if (chip8->registers[vx] == NN) {
+		chip8->PC += 2;
+	}
+	break;
+	}
+case 0x40: {
+	uint8_t vx = (instr & 0x0F00) >> 8;
+	uint8_t NN = instr & 0x00FF;
+
+	if (vx > VF) {
+		fprintf(stderr, "Tried to access non-existant register addr: %d", vx);
+		chip8->running = 0;
+		return;
+	}
+	#ifdef DEBUG
+	printf("Compare NOT: %d != %d(NN)\n", 
+		chip8->registers[vx], NN);
+	#endif
+
+	// Skip next instruction if NN != Vx
+	if (chip8->registers[vx] != NN) {
+		chip8->PC += 2;
+	}  
+	break;
+	}
+case 0x50: {
+	uint8_t vx = (instr & 0x0F00) >> 8;
+	uint8_t vy = (instr & 0X00F0) >> 4;
+	
+	if (vx > VF || vy > VF) {
+		fprintf(stderr, "Tried to access non-existant register addr: vx: %d vy: %d", vx, vy);
+		chip8->running = 0;
+		return;
+	}
+	#ifdef DEBUG
+	printf("Compare: %d == %d(vy)\n", 
+		chip8->registers[vx], chip8->registers[vy]);
+	#endif
+
+	if (chip8->registers[vx] == chip8->registers[vy]) {
+		chip8->PC += 2;
+	}
+
+	break;
+	}
+case 0x60: {
+	uint8_t vx = (instr & 0x0F00) >> 8;
+	uint8_t NN = instr & 0x00FF;
+
+	if (vx > VF) {
+		fprintf(stderr, "Tried to access non-existant register addr: %d", vx);
+		chip8->running = 0;
+		return;
+	}
+	#ifdef DEBUG
+	printf("V%d set to %d == %d(NN)\n", 
+		vx, chip8->registers[vx], NN);
+	#endif
+	chip8->registers[vx] = NN;
+	break;
+	}
+case 0x70: {
+	uint8_t vx = (instr & 0x0F00) >> 8;
+	uint8_t NN = instr & 0x00FF;
+
+	if (vx > VF) {
+		fprintf(stderr, "Tried to access non-existant register addr: %d", vx);
+		chip8->running = 0;
+		return;
+	}
+	#ifdef DEBUG
+	printf("Add %d to V%d = %d\n", 
+		NN, vx, chip8->registers[vx]);
+	#endif
+	chip8->registers[vx] += NN; 
+	break;
+	}
+case 0x80: {
+	uint8_t subflag = instr & 0x000F;
+	uint8_t vx = (instr & 0x0F00) >> 8;
+	uint8_t vy = (instr & 0X00F0) >> 4;
+
+	if (vx > VF || vy > VF) {
+		fprintf(stderr, "Tried to access non-existant register addr: vx: %d vy: %d", vx, vy);
+		chip8->running = 0;
+		return;
+	}
+
+	switch (subflag) {
+		case 0x0:
+			chip8->registers[vx] = chip8->registers[vy];
+			#ifdef DEBUG
+			printf("Set V%d to V%d = %d\n", 
+			vx, vy, chip8->registers[vx]);
+			#endif
+			break;
+		case 0x1:
+			chip8->registers[vx] |= chip8->registers[vy];
+			#ifdef DEBUG
+			printf("bitwise OR V%d to V%d = %d\n", 
+			vx, vy, chip8->registers[vx]);
+			#endif
+			break;
+		case 0x2:
+			chip8->registers[vx] &= chip8->registers[vy];
+			#ifdef DEBUG
+			printf("bitwise AND V%d to V%d = %d\n", 
+			vx, vy, chip8->registers[vx]);
+			#endif
+			break;
+		case 0x3:
+			chip8->registers[vx] ^= chip8->registers[vy];
+			#ifdef DEBUG
+			printf("bitwise XOR V%d to V%d = %d\n", 
+			vx, vy, chip8->registers[vx]);
+			#endif
+			break;
+		case 0x4: {
+			uint16_t res = chip8->registers[vx] + chip8->registers[vy];
+			// max value of a uint8_t 255
+			// check for overflow first
+			if (res > UINT8_MAX) {
+				#ifdef DEBUG
+				printf("overflow detected\n");
+				#endif		
+				chip8->registers[VF] = 1;
+			}
+			else chip8->registers[VF] = 0;
+			
+			chip8->registers[vx] += chip8->registers[vy];
+			
+			#ifdef DEBUG
+			printf("Add V%d to V%d = %d\n", 
+			vy, vx, chip8->registers[vx]);
+			#endif
+			break;
+			}
+		case 0x5: {
+			// signed to check for underflow
+			int res = chip8->registers[vx] - chip8->registers[vy];
+			// max value of a uint8_t 255
+			// check for overflow first
+			if (res < 0) {
+				#ifdef DEBUG
+				printf("underflow detected\n");
+				#endif		
+				chip8->registers[VF] = 0;
+			}
+			else chip8->registers[VF] = 1;
+			
+			chip8->registers[vx] -= chip8->registers[vy];
+			
+			#ifdef DEBUG
+			printf("substract V%d to V%d = %d\n", 
+			vy, vx, chip8->registers[vx]);
+			#endif
+			break;
+		}
+		case 0x6: {
+			// store least significant bit in VF
+			chip8->registers[VF] = chip8->registers[vx] & 0x1;
+			chip8->registers[vx] >>= 1;
+
+			#ifndef DEBUG
+			printf("Shift V%d >> 1 = %d\n",
+				vx, chip8->registers[vx]);
+			#endif
+			break;
+		}
+		case 0x7: {
+			int res = chip8->registers[vy] - chip8->registers[vx];
+			if (res < 0) {
+				#ifdef DEBUG
+				printf("underflow detected\n");
+				#endif
+				chip8->registers[VF] = 0;
+			}
+			else chip8->registers[VF] = 1;
+			chip8->registers[vx] = chip8->registers[vy] - chip8->registers[vx];
+			#ifdef DEBUG
+			printf("substract V%d(Vy) - V%d = %d\n",
+				vy, vx, chip8->registers[vx]);
+			#endif
+			break;
+		}
+		case 0xE: {
+			// store most significant
+			chip8->registers[VF] = chip8->registers[vx] & (0x01 << 7);
+			chip8->registers[vx] <<= 1;
+			#ifndef DEBUG
+			printf("Shift V%d << 1 = %d\n",
+				vx, chip8->registers[vx]);
+			#endif
+			break;
+		}
+	}
+	break;
+	}
+
+case 0x90: {
+	uint8_t vx = (instr & 0x0F00) >> 8;
+	uint8_t vy = (instr & 0X00F0) >> 4;
+		
+	if (vx > VF || vy > VF) {
+		fprintf(stderr, "Tried to access non-existant register addr: vx: %d vy: %d", vx, vy);
+		chip8->running = 0;
+		return;
+	}
+
+	#ifndef DEBUG
+	printf("Skip next V%d != V%d\n",
+		vx, vy);
+	#endif
+
+	if (chip8->registers[vx] != chip8->registers[vy]) {
+		chip8->PC +=2;
+	}
+	break;	
+	}
+case 0xA0: {
+	uint16_t addr = instr & 0X0FFF;
+	chip8->I = addr;
+	#ifndef DEBUG
+	printf("Set I to %d\n",
+		chip8->I);
+	#endif
+	break;
+	}
+case 0xB0: {
+	uint16_t addr = instr & 0X0FFF;
+	#ifndef DEBUG
+	printf("JMP to (V0) %d + %d = %d\n",
+		chip8->registers[V0], addr, addr + chip8->registers[V0]);
+	#endif
+	
+	chip8->PC = chip8->registers[V0] + addr;
+	chip8->jmp_flag = 1;
+	break;
+	}
+
 	default:
 		fprintf(stderr, "UNKNOWN OPCODE: %04x\n", instr);
 		chip8->running = 0;
