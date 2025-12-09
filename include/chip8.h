@@ -18,17 +18,20 @@ typedef struct chip8 {
 	stack_t	stack;
 	uint8_t registers[16];
 
-	uint16_t *PC;
+	uint16_t opcode; // current opcode
+	uint16_t PC;
 	uint16_t I;
 	uint8_t SP;
 	uint8_t DT;
 	uint8_t ST;
 
+	uint8_t key;	// current pressed key, 0 means None
 	// display struct pointer used to handle drawing to an SDL window
 	display_t displ;
 
-	int running_flag	:1; // flag
-	int draw_flag		:1;	// flag
+	int running			:1; // flag
+	int draw			:1;	// flag
+	int paused			:1; // flag
 } chip8_t; 
 
 enum registers {

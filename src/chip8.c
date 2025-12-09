@@ -3,6 +3,7 @@
 #include <inttypes.h>
 
 #include "../include/chip8.h"
+#include "SDL2/SDL.h"
 
 #define PC_START 0x200
 #define MEM_END  0xFFF
@@ -61,12 +62,18 @@ int init(chip8_t *chip8, char *rom_path) {
 	chip8->stack.size = 0;
 
 	// put the PC at 0x200
-	chip8->PC = (uint16_t *)(chip8->memory + PC_START);
+	chip8->PC = PC_START;
+
+	chip8->opcode = 
+		(chip8->memory[chip8->PC] << 8) + chip8->memory[chip8->PC+1];
+
 	chip8->DT = 0;
 	chip8->ST = 0;
 	chip8->I = 0;
 
-	chip8->running_flag = 1;
+	chip8->key = 0;
+
+	chip8->running = 1;
 
 	fclose(fp);
 	return 0;
@@ -74,19 +81,83 @@ int init(chip8_t *chip8, char *rom_path) {
 }
 
 void fetch(chip8_t *chip8) {
-	chip8->PC++;
+	if (!chip8->paused)
+		chip8->PC += 2;
+	// Reverse endian
+	chip8->opcode = 
+		(chip8->memory[chip8->PC] << 8) + chip8->memory[chip8->PC+1];
 }
 
 void decode_and_exec(chip8_t *chip8) {
-	// TODO
-	uint16_t instr = *(chip8->PC);
-	printf("INSTR: %04x\n", instr);
-
-	if ((uint8_t *)chip8->PC == chip8->memory + MEM_END) {
-		printf("Reached MEM_END\n");
-		chip8->running_flag = 0;
+	// if not running, free the display and destroy SDL
+	if (!chip8->running) {
+		displ_destroy(chip8->displ);
+		return;
 	}
 
-	// if not running, free the display
-	if (!chip8->running_flag) displ_destroy(chip8->displ);
+	if (chip8->paused) return;
+	uint16_t instr = chip8->opcode;
+	uint8_t flag = (chip8->opcode >> 8) & 0xF0;
+
+	#ifdef DEBUG
+	printf("OPCODE: %04x\n", instr);
+	#endif
+
+	// TODO
+	// Parse instructions
+	switch (flag) {
+	case 0x00:
+		if (instr == 0x00E0) {
+			#ifdef DEBUG
+			printf("Clear screen.\n");
+			#endif
+			displ_clear(chip8->displ);
+		}
+		else if (instr == 0x00EE) {			
+			if (chip8->stack.size > 0) {
+				#ifdef DEBUG
+				printf("Return to addr %d from stack\n", *(chip8->stack.array[chip8->stack.size]));
+				#endif
+				// very ugly, TODO
+				chip8->PC = *(chip8->stack.array[chip8->stack.size]);
+				chip8->stack.size--;
+			}
+			else {
+				fprintf(stderr, "Stack underflow Error!\n");
+				chip8->running = 0;
+				break;
+			}
+		}
+		else {
+			// TODO 
+			uint8_t addr = instr & 0x0FFF;
+			
+			#ifdef DEBUG
+			printf("Call machine code to %d.\n", 
+				addr);
+			#endif
+			
+			if (chip8->stack.size >= 16) {
+				fprintf(stderr, "Stack overflow Error!\n");
+				chip8->running = 0;
+				break;
+			}
+
+			*(chip8->stack.array[chip8->stack.size++]) = chip8->PC;
+			chip8->PC = addr;
+			chip8->opcode = (chip8->memory[chip8->PC] << 8) + chip8->memory[chip8->PC+1];
+		}
+		break;
+	default:
+		// fprintf(stderr, "UNKNOWN OPCODE: %04x\n", instr);
+		// chip8->running = 0;
+		break;		
+	}
+
+	if (chip8->PC+1 == MEM_END) {
+		printf("Reached MEM_END\n");
+		// temp
+		chip8->paused = 1;
+	}
+
 }

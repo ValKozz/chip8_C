@@ -56,6 +56,13 @@ display_t displ_init(void) {
 	return displ;
 }
 
+void displ_clear(display_t displ) {
+	// set to black
+	SDL_SetRenderDrawColor(displ->renderer, 0, 0, 0, 255);
+	SDL_RenderClear(displ->renderer);
+	SDL_RenderPresent(displ->renderer);
+}
+
 void displ_destroy(display_t displ) {
 	SDL_DestroyWindow(displ->window);
 	SDL_DestroyRenderer(displ->renderer);

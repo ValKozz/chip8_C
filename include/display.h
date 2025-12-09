@@ -17,5 +17,7 @@ typedef struct display {
 // Init SDL, window and renderer and return the struct holding them
 display_t displ_init(void);
 void displ_destroy(display_t displ);
+// used to clear the screen
+void displ_clear(display_t displ);
 
 #endif

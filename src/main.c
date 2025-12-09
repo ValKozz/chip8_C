@@ -1,6 +1,7 @@
 #include <stdio.h>
 
 #include "../include/chip8.h"
+#include "../include/input.h"
 
 int main(int argc, char **argv) {
 	if (argc < 2) {
@@ -15,7 +16,8 @@ int main(int argc, char **argv) {
 		return 1;
 	}
 
-	while (chip8.running_flag) {
+	while (chip8.running) {
+		handle_input(&chip8);
 		decode_and_exec(&chip8);
 		fetch(&chip8);
 	}

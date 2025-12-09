@@ -2,15 +2,18 @@ CC=gcc
 
 BUILD_DIR = build
 INCLUDE_DIR = include
-
 LDLIBS = -lSDL2
-CFLAGS= -I $(INCLUDE_DIR) -Wall -Wextra -g
+CFLAGS = -Wall -Wextra
+INCLFLAGS = -I $(INCLUDE_DIR)
 
-$(BUILD_DIR)/chip8: src/main.c src/chip8.c src/display.c
+$(BUILD_DIR)/chip8: src/main.c src/chip8.c src/display.c src/input.c
 	mkdir -p $(BUILD_DIR)
-	$(CC) $^ -o $@ $(CFLAGS) $(LDLIBS)
+	$(CC) $^ -o $@ $(CFLAGS) $(LDLIBS) $(INCLFLAGS)
 
 clean:
 	rm -rf $(BUILD_DIR)
+
+debug: CFLAGS += -DDEBUG -g
+debug: all
 
 all: $(BUILD_DIR)/chip8
