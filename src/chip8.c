@@ -4,6 +4,7 @@
 
 #include "../include/chip8.h"
 #include "../include/input.h"
+#include "../include/instruction.h"
 #include "SDL2/SDL.h"
 
 #define PC_START 0x200
@@ -429,7 +430,7 @@ void decode_and_exec(chip8_t *chip8) {
 		uint8_t vy = (instr & 0X00F0) >> 4;
 		
 		if (vx > VF || vy > VF) {
-			fprintf(stderr, "ERROR: Tried to access non-existant register NNN: vx: %d vy: %d", vx, vy);
+			fprintf(stderr, "ERROR: Tried to access non-existant register: vx: %d vy: %d", vx, vy);
 			chip8->running = 0;
 			return;
 		}

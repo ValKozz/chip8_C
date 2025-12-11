@@ -5,6 +5,7 @@
 #include <inttypes.h>
 
 #include "../include/display.h"
+#include "../include/instruction.h"
 
 #define SYS_MEMORY 4096
 
