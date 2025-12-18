@@ -6,7 +6,7 @@ LDLIBS = -lSDL2
 CFLAGS = -Wall -Wextra
 INCLFLAGS = -I $(INCLUDE_DIR)
 
-$(BUILD_DIR)/chip8: src/main.c src/chip8.c src/display.c src/input.c
+$(BUILD_DIR)/chip8: src/main.c src/chip8.c src/input.c src/display.c
 	mkdir -p $(BUILD_DIR)
 	$(CC) $^ -o $@ $(CFLAGS) $(LDLIBS) $(INCLFLAGS)
 
