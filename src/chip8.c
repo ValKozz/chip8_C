@@ -279,12 +279,13 @@ void decode_and_exec(chip8_t *chip8) {
 		}
 	case 0x6: {
 		validate_X(chip8, X);
+		chip8->registers[X] = NN;\
 
 		#ifdef DEBUG
 		printf("V%d set to %d\n", 
 			X, chip8->registers[X]);
 		#endif
-		chip8->registers[X] = NN;
+		
 		break;
 		}
 	case 0x7: {
@@ -323,7 +324,7 @@ void decode_and_exec(chip8_t *chip8) {
 				#endif
 				break;
 			case 0x3:
-				chip8->registers[X] &= chip8->registers[Y];
+				chip8->registers[X] ^= chip8->registers[Y];
 				#ifdef DEBUG
 				printf("bitwise XOR V%d to V%d = %d\n", 
 				X, Y, chip8->registers[X]);
@@ -454,7 +455,6 @@ void decode_and_exec(chip8_t *chip8) {
 
 		uint8_t screen_x = chip8->registers[X];
 		uint8_t screen_y = chip8->registers[Y];
-
 		#ifdef DEBUG
 		printf("Draw on screen: %d(V%d) %d(V%d) height: %d\n",
 		screen_x, X, screen_y, Y, N);
@@ -564,16 +564,24 @@ void decode_and_exec(chip8_t *chip8) {
 			chip8->memory[chip8->I + 2] = (chip8->registers[X] % 100) % 10;
 			break;
 		case 0x55: {
+			validate_X(chip8, X);
+			#ifdef DEBUG
+			printf("Store from V0 to V%d registers\n", X);
+			#endif
 			size_t i = 0;
-			while (i < VF) {
+			while (i <= X) {
 				chip8->memory[chip8->I + i] = chip8->registers[i];
 				i++;
 			}
 			break;
 		}
 		case 0x65: {
+			validate_X(chip8, X);
+			#ifdef DEBUG
+			printf("Store from V0 to V%d in memory\n", X);
+			#endif
 			size_t i = 0;
-			while (i < VF) {
+			while (i <= X) {
 				chip8->registers[i] = chip8->memory[chip8->I + i];
 				i++;
 			}
